@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ConsoleApp1;
+using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
@@ -13,7 +14,7 @@ namespace MultiServer
         private const int BUFFER_SIZE = 2048;
         private const int PORT = 11000;
         private static readonly byte[] buffer = new byte[BUFFER_SIZE];
-        static List<Socket> sockets = new List<Socket>();
+        static List<Fighter> sockets = new List<Fighter>();
         public static void Main()
         {
             Console.Title = "Server";
@@ -60,9 +61,13 @@ namespace MultiServer
             }
                      
             socket.BeginReceive(buffer, 0, BUFFER_SIZE, SocketFlags.None, ReceiveCallback, socket);
-            sockets.Add(socket);
+            Fighter f = new Fighter();
+            Fighter.fighters++;
+            f.id = Fighter.fighters;
+            f.socket = socket; 
+            sockets.Add(f);
             int i = 1;
-            foreach(Socket s in sockets)
+            foreach(Fighter fi in sockets)
             {
                 Console.WriteLine(i);
                 i++;
@@ -94,35 +99,40 @@ namespace MultiServer
             string text = Encoding.ASCII.GetString(recBuf);
             Console.WriteLine("Received Text: " + text);
 
-            if (text.ToLower() == "get time") // Client requested time
+            if (text.Equals("Charmander") || text.Equals("Squirtle") || text.Equals("Bulbasaur"))
             {
-                Console.WriteLine("Text is a get time request");
-                byte[] data = Encoding.ASCII.GetBytes(DateTime.Now.ToLongTimeString());
-                current.Send(data);
-                int i = 1;
-                foreach(Socket s in sockets)
+                foreach(Fighter f in sockets)
                 {
-                    Console.WriteLine(i);
-                    i++;
-                    s.Send(Encoding.ASCII.GetBytes("hola"));
+                    if (f.socket.Equals(current))
+                    {
+                        f.pokemon = text;
+                        f.ready = true;
+                    }
                 }
-                Console.WriteLine("Time sent to client");
             }
-            else if (text.ToLower() == "exit") // Client wants to exit gracefully
+
+            if (sockets.TrueForAll(x => x.ready))
             {
-                // Always Shutdown before closing
-                current.Shutdown(SocketShutdown.Both);
-                current.Close();
-                clientSockets.Remove(current);
-                Console.WriteLine("Client disconnected");
-                return;
+                Console.WriteLine("Ready");
             }
-            else
+
+            
+            int i = 1;
+            foreach (Fighter s in sockets)
             {
-                Console.WriteLine("Text is an invalid request");
-                byte[] data = Encoding.ASCII.GetBytes("Invalid request");
-                current.Send(data);
-                Console.WriteLine("Warning Sent");
+                
+                i++;
+                byte[] b = new byte[512];
+                string msg = "hola";
+                int x = 0;
+                foreach (byte by in msg)
+                {
+                    b[x] = by;
+                    x++;
+                }
+                b[x] = Encoding.UTF8.GetBytes("$")[0];
+                s.socket.Send(b);
+                Console.WriteLine("sended to {0} {1}", i, Encoding.UTF8.GetString(b));
             }
 
             current.BeginReceive(buffer, 0, BUFFER_SIZE, SocketFlags.None, ReceiveCallback, current);
