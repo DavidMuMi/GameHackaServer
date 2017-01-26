@@ -9,6 +9,7 @@ namespace MultiServer
 {
     class Program
     {
+        private static bool created = false;
         private static readonly Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         private static readonly List<Socket> clientSockets = new List<Socket>();
         private const int BUFFER_SIZE = 2048;
@@ -59,15 +60,15 @@ namespace MultiServer
             {
                 return;
             }
-                     
+
             socket.BeginReceive(buffer, 0, BUFFER_SIZE, SocketFlags.None, ReceiveCallback, socket);
             Fighter f = new Fighter();
             Fighter.fighters++;
             f.id = Fighter.fighters;
-            f.socket = socket; 
+            f.socket = socket;
             sockets.Add(f);
             int i = 1;
-            foreach(Fighter fi in sockets)
+            foreach (Fighter fi in sockets)
             {
                 Console.WriteLine(i);
                 i++;
@@ -80,10 +81,10 @@ namespace MultiServer
         {
             Socket current = (Socket)AR.AsyncState;
             int received;
-            
+
             try
             {
-                received = current.EndReceive(AR);                
+                received = current.EndReceive(AR);
             }
             catch (SocketException)
             {
@@ -101,7 +102,7 @@ namespace MultiServer
 
             if (text.Equals("Charmander") || text.Equals("Squirtle") || text.Equals("Bulbasaur"))
             {
-                foreach(Fighter f in sockets)
+                foreach (Fighter f in sockets)
                 {
                     if (f.socket.Equals(current))
                     {
@@ -109,32 +110,62 @@ namespace MultiServer
                         f.ready = true;
                     }
                 }
-            }
 
-            if (sockets.TrueForAll(x => x.ready))
-            {
-                Console.WriteLine("Ready");
-            }
-
-            
-            int i = 1;
-            foreach (Fighter s in sockets)
-            {
-                
-                i++;
-                byte[] b = new byte[512];
-                string msg = "hola";
-                int x = 0;
-                foreach (byte by in msg)
+                if (sockets.TrueForAll(x => x.ready) && sockets.Count == 2 && !Program.created)
                 {
-                    b[x] = by;
-                    x++;
-                }
-                b[x] = Encoding.UTF8.GetBytes("$")[0];
-                s.socket.Send(b);
-                Console.WriteLine("sended to {0} {1}", i, Encoding.UTF8.GetString(b));
-            }
+                    Console.WriteLine("Ready");
+                    int i = 0;
+                    foreach (Fighter s in sockets)
+                    {
 
+                        byte[] b = new byte[512];
+                        string msg = "";
+
+                        if (i == 0)
+                        {
+                            msg = sockets[0].pokemon + "$" + sockets[1].pokemon + "$T";
+                        }
+                        else
+                        {
+                            msg = sockets[1].pokemon + "$" + sockets[0].pokemon + "$F";
+                        }
+
+                        int x = 0;
+                        foreach (byte by in msg)
+                        {
+                            b[x] = by;
+                            x++;
+                        }
+
+                        s.socket.Send(b);
+                        Console.WriteLine(Encoding.UTF8.GetString(b));
+                        i++;
+                    }
+                    Program.created = true;
+                }
+            }            
+            else
+            {
+                string msg = "A$" + text;
+                foreach (Fighter s in sockets)
+                {
+                    if (!s.socket.Equals(current))
+                    {
+                        byte[] b = new byte[512];
+                        int x = 0;
+                        foreach (byte by in msg)
+                        {
+                            b[x] = by;
+                            x++;
+                        }
+                        s.socket.Send(b);
+                        Console.WriteLine(Encoding.UTF8.GetString(b));
+                    }
+
+                }
+
+               
+            }
             current.BeginReceive(buffer, 0, BUFFER_SIZE, SocketFlags.None, ReceiveCallback, current);
         }
     }
